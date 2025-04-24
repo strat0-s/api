@@ -8,8 +8,18 @@ const signer = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
 const contract = new ethers.Contract(process.env.CONTRACT_ADDRESS, contractABI, signer);
 
 const app = express();
+
+app.use((req, res, next) => {
+  res.setHeader(
+    "Content-Security-Policy",
+    "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'"
+  );
+  next();
+});
+
 const setupSwagger = require("./swagger");
 setupSwagger(app);
+
 app.use(express.json());
 
 /**

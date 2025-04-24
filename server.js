@@ -14,7 +14,7 @@ app.post("/register", async (req, res) => {
     const { userId, publicKey } = req.body;
 
     if (!userId || !publicKey) {
-        return res.status(400).json({ error: "userId and publicKey are required" });
+        return res.status(400).json({ error: "userId and publicKey fields are required" });
     }
 
     try {

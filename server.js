@@ -8,8 +8,37 @@ const signer = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
 const contract = new ethers.Contract(process.env.CONTRACT_ADDRESS, contractABI, signer);
 
 const app = express();
+const setupSwagger = require("./swagger");
+setupSwagger(app);
 app.use(express.json());
 
+/**
+ * @swagger
+ * /register:
+ *   post:
+ *     summary: Register a user with their public key
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - userId
+ *               - publicKey
+ *             properties:
+ *               userId:
+ *                 type: string
+ *               publicKey:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: User registered successfully
+ *       400:
+ *         description: Missing fields or user already registered
+ *       500:
+ *         description: Internal server error
+ */
 app.post("/register", async (req, res) => {
     const { userId, publicKey } = req.body;
 
@@ -33,7 +62,26 @@ app.post("/register", async (req, res) => {
     }
 });
 
-
+/**
+ * @swagger
+ * /user/{userId}:
+ *   get:
+ *     summary: Get a user's public key
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: User ID to fetch
+ *     responses:
+ *       200:
+ *         description: Successfully retrieved public key
+ *       404:
+ *         description: User not registered
+ *       500:
+ *         description: Internal server error
+ */
 app.get("/user/:userId", async (req, res) => {
     const { userId } = req.params;
     try {

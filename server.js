@@ -106,3 +106,8 @@ app.get("/user/:userId", async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 });
+
+const port = process.env.PORT || 3000;
+app.listen(port, () => {
+    console.log(`Server is listening on port ${port}`);
+});

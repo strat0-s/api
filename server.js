@@ -1,6 +1,7 @@
 const express = require("express");
 const { ethers } = require("ethers");
 const forge = require("node-forge");
+const cors = require("cors");
 require("dotenv").config();
 const { abi: contractABI } = require("./abi/KeyManagerV2.json");
 
@@ -17,6 +18,7 @@ app.use((req, res, next) => {
   );
   next();
 });
+app.use(cors());
 
 const setupSwagger = require("./swagger");
 setupSwagger(app);

@@ -3,26 +3,18 @@ const { ethers } = require("ethers");
 const forge = require("node-forge");
 const cors = require("cors");
 require("dotenv").config();
-const { abi: contractABI } = require("./abi/KeyManagerV2.json");
+const { abi: contractABI } = require("./abi/KeyManagerV3.json");
 
 const provider = new ethers.JsonRpcProvider(process.env.ALCHEMY_API_KEY);
 const signer = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
 const contract = new ethers.Contract(process.env.CONTRACT_ADDRESS, contractABI, signer);
 
 const app = express();
-
-app.use((req, res, next) => {
-  res.setHeader(
-    "Content-Security-Policy",
-    "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'"
-  );
-  next();
-});
-app.use(cors());
+app.use(cors({ origin: "*" }));
+app.use(express.json());
 
 const setupSwagger = require("./swagger");
 setupSwagger(app);
-app.use(express.json());
 
 // Utility: JSON → DER bytes
 function rsaJsonToDerBytes(jsonKey) {
@@ -47,7 +39,7 @@ function derBytesToRsaJson(buffer) {
 
 /**
  * @swagger
- * /register:
+ * /registerUser:
  *   post:
  *     summary: Register a user with their public key
  *     requestBody:
@@ -77,7 +69,7 @@ function derBytesToRsaJson(buffer) {
  *       500:
  *         description: Internal server error
  */
-app.post("/register", async (req, res) => {
+app.post("/registerUser", async (req, res) => {
     const { userId, publicKey } = req.body;
 
     if (!userId || !publicKey?.n || !publicKey?.e) {
@@ -103,7 +95,7 @@ app.post("/register", async (req, res) => {
 
 /**
  * @swagger
- * /user/{userId}:
+ * /getUser/{userId}:
  *   get:
  *     summary: Get a user's public key
  *     parameters:
@@ -121,7 +113,7 @@ app.post("/register", async (req, res) => {
  *       500:
  *         description: Internal server error
  */
-app.get("/user/:userId", async (req, res) => {
+app.get("/getUser/:userId", async (req, res) => {
     const { userId } = req.params;
     try {
         const isRegistered = await contract.isUserRegistered(userId);
@@ -131,10 +123,105 @@ app.get("/user/:userId", async (req, res) => {
 
         const publicKeyBytes = await contract.getPublicKey(userId);
         const buffer = Buffer.from(publicKeyBytes.slice(2), 'hex'); // remove 0x
-
         const jsonKey = derBytesToRsaJson(buffer);
+
         res.status(200).json({ userId, publicKey: jsonKey });
-    } catch(error) {
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+/**
+ * @swagger
+ * /updateUser:
+ *   post:
+ *     summary: Update a registered user's public key
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - userId
+ *               - publicKey
+ *             properties:
+ *               userId:
+ *                 type: string
+ *               publicKey:
+ *                 type: object
+ *                 properties:
+ *                   e:
+ *                     type: integer
+ *                   n:
+ *                     type: string
+ *     responses:
+ *       200:
+ *         description: Public key updated successfully
+ *       400:
+ *         description: Missing fields
+ *       404:
+ *         description: User not registered
+ *       500:
+ *         description: Internal server error
+ */
+app.post("/updateUser", async (req, res) => {
+    const { userId, publicKey } = req.body;
+
+    if (!userId || !publicKey?.n || !publicKey?.e) {
+        return res.status(400).json({ error: "userId and publicKey are required" });
+    }
+
+    try {
+        const isRegistered = await contract.isUserRegistered(userId);
+        if (!isRegistered) {
+            return res.status(404).json({ error: "User not Registered" });
+        }
+
+        const publicKeyBytes = rsaJsonToDerBytes(publicKey);
+        const tx = await contract.updatePublicKey(userId, publicKeyBytes);
+        await tx.wait();
+
+        res.status(200).json({ message: `Public Key updated for User ID: ${userId}`, txHash: tx.hash });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+/**
+ * @swagger
+ * /deleteUser/{userId}:
+ *   delete:
+ *     summary: Delete a user's public key
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: User ID to delete
+ *     responses:
+ *       200:
+ *         description: User deleted successfully
+ *       404:
+ *         description: User not registered
+ *       500:
+ *         description: Internal server error
+ */
+app.delete("/deleteUser/:userId", async (req, res) => {
+    const { userId } = req.params;
+
+    try {
+        const isRegistered = await contract.isUserRegistered(userId);
+        if (!isRegistered) {
+            return res.status(404).json({ error: "User not Registered" });
+        }
+
+        const tx = await contract.deletePublicKey(userId);
+        await tx.wait();
+
+        res.status(200).json({ message: `User with User ID: ${userId} deleted successfully` });
+    } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
@@ -143,5 +230,3 @@ const port = process.env.PORT || 3000;
 app.listen(port, () => {
     console.log(`Server is listening on port ${port}`);
 });
-
-console.log()

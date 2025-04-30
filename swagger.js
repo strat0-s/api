@@ -5,7 +5,7 @@ const options = {
   definition: {
     openapi: "3.0.0",
     info: {
-      title: "KeyManager API",
+      title: "Keylinx",
       version: "1.0.0",
       description: "API for managing user public keys onchain",
     },
